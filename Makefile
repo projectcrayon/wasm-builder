@@ -1,5 +1,5 @@
 # Control the installation direction of emsdk
-EMSDK=/tmp/emsdk
+EMSDK=/Users/kivutar/emsdk/
 
 RETRO_BC = libretro.bc
 FE = cores/frontend

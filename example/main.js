@@ -66,10 +66,16 @@ function pollInputs(retro) {
         if (joyMapping.hasOwnProperty(code))
           retro.input_user_state[pad.index][joyMapping[code]] = v.pressed
       });
-      if (pad.axes[0] >  0.5) retro.input_user_state[pad.index][7] = true;
-      if (pad.axes[0] < -0.5) retro.input_user_state[pad.index][6] = true;
-      if (pad.axes[1] >  0.5) retro.input_user_state[pad.index][5] = true;
-      if (pad.axes[1] < -0.5) retro.input_user_state[pad.index][4] = true;
+
+      // if (pad.axes[0] >  0.5) retro.input_user_state[pad.index][7] = true;
+      // if (pad.axes[0] < -0.5) retro.input_user_state[pad.index][6] = true;
+      // if (pad.axes[1] >  0.5) retro.input_user_state[pad.index][5] = true;
+      // if (pad.axes[1] < -0.5) retro.input_user_state[pad.index][4] = true;
+
+      retro.input_analogL_user_state[pad.index][0] = pad.axes[0] * (32 * 1024 - 1);
+      retro.input_analogL_user_state[pad.index][1] = pad.axes[1] * (32 * 1024 - 1);
+      retro.input_analogR_user_state[pad.index][0] = pad.axes[2] * (32 * 1024 - 1);
+      retro.input_analogR_user_state[pad.index][1] = pad.axes[3] * (32 * 1024 - 1);
     }
   }, 8)
 }
