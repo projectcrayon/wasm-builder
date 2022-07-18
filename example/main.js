@@ -2,7 +2,7 @@ import Video from "./vendors/Video.js";
 import Audio from "./vendors/Audio.js";
 
 const keyMapping = {
-  KeyZ: 0, // RETRO_DEVICE_ID_JOYPAD_B
+  KeyS: 0, // RETRO_DEVICE_ID_JOYPAD_B
   KeyA: 1, // RETRO_DEVICE_ID_JOYPAD_Y
   ShiftRight: 2, // RETRO_DEVICE_ID_JOYPAD_SELECT
   Enter: 3, // RETRO_DEVICE_ID_JOYPAD_START
@@ -10,10 +10,10 @@ const keyMapping = {
   ArrowDown: 5, // RETRO_DEVICE_ID_JOYPAD_DOWN
   ArrowLeft: 6, // RETRO_DEVICE_ID_JOYPAD_LEFT
   ArrowRight: 7, // RETRO_DEVICE_ID_JOYPAD_RIGHT
-  KeyX: 8, // RETRO_DEVICE_ID_JOYPAD_A
-  KeyS: 9, // RETRO_DEVICE_ID_JOYPAD_X
+  KeyD: 8, // RETRO_DEVICE_ID_JOYPAD_A
+  KeyW: 9, // RETRO_DEVICE_ID_JOYPAD_X
   KeyQ: 10, // RETRO_DEVICE_ID_JOYPAD_L
-  KeyW: 11, // RETRO_DEVICE_ID_JOYPAD_R
+  KeyE: 11, // RETRO_DEVICE_ID_JOYPAD_R
 };
 
 const joyMapping = {
