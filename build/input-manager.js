@@ -71,7 +71,7 @@ export class InputManager {
     this.keyboardState = new Array(MAX_INPUTS).fill(false);
     this.gamepadState = new Array(MAX_INPUTS).fill(false);
     this.gamepadBindings = normalizeBindings();
-    this.gamepadButtonMap = {};
+    this.gamepadButtonMap = new Map();
     this.trackedInputs = [];
 
     this.retro = null;
@@ -283,18 +283,22 @@ export class InputManager {
 
   updateBindings(bindings) {
     this.gamepadBindings = normalizeBindings(bindings);
-    this.gamepadButtonMap = {};
+    this.gamepadButtonMap = new Map();
     for (const [action, buttonIndex] of Object.entries(this.gamepadBindings)) {
       const target = GAMEPAD_ACTION_TARGETS[action];
       if (target == null) continue;
       if (Number.isFinite(buttonIndex)) {
-        this.gamepadButtonMap[buttonIndex] = target;
+        const list = this.gamepadButtonMap.get(buttonIndex) || [];
+        if (!list.includes(target)) {
+          list.push(target);
+          this.gamepadButtonMap.set(buttonIndex, list);
+        }
       }
     }
     this.trackedInputs = Array.from(
       new Set([
         ...Object.values(KEYBOARD_MAPPING),
-        ...Object.values(this.gamepadButtonMap),
+        ...Array.from(this.gamepadButtonMap.values()).flat(),
         ...Object.values(GAMEPAD_DPAD_MAP),
         ...GAMEPAD_AXIS_MAP.flatMap((mapping) => [
           mapping.negative,
@@ -302,6 +306,7 @@ export class InputManager {
         ]),
       ])
     ).sort((a, b) => a - b);
+    this.gamepadState.fill(false);
     this.updateAllInputs();
   }
 
@@ -382,9 +387,17 @@ export class InputManager {
       if (!button) return;
       const active = typeof button === "object" ? button.pressed : button === 1;
       if (!active) return;
-      const target = this.gamepadButtonMap[index] ?? GAMEPAD_DPAD_MAP[index];
-      if (target != null && target < this.gamepadState.length) {
-        this.gamepadState[target] = true;
+      const targets = this.gamepadButtonMap.get(index);
+      if (Array.isArray(targets)) {
+        targets.forEach((target) => {
+          if (target != null && target < this.gamepadState.length) {
+            this.gamepadState[target] = true;
+          }
+        });
+      }
+      const dpadTarget = GAMEPAD_DPAD_MAP[index];
+      if (dpadTarget != null && dpadTarget < this.gamepadState.length) {
+        this.gamepadState[dpadTarget] = true;
       }
     });
 

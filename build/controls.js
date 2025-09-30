@@ -18,21 +18,31 @@ function loadVolume() {
 
 function loadBindings() {
   try {
-    const raw = localStorage.getItem(BINDINGS_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_GAMEPAD_BUTTON_BINDINGS };
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") {
-      return {
-        ...DEFAULT_GAMEPAD_BUTTON_BINDINGS,
-        ...Object.fromEntries(
-          Object.entries(parsed).map(([key, value]) => [key, Number(value)])
-        ),
-      };
-    }
-  } catch (err) {
-    console.warn("Failed to restore saved gamepad bindings", err);
+  const raw = localStorage.getItem(BINDINGS_STORAGE_KEY);
+  if (!raw) return { ...DEFAULT_GAMEPAD_BUTTON_BINDINGS };
+  const parsed = JSON.parse(raw);
+  if (parsed && typeof parsed === "object") {
+    return normalizeBindingShape(parsed);
   }
+} catch (err) {
+  console.warn("Failed to restore saved gamepad bindings", err);
+}
   return { ...DEFAULT_GAMEPAD_BUTTON_BINDINGS };
+}
+
+function normalizeBindingShape(source) {
+  const result = { ...DEFAULT_GAMEPAD_BUTTON_BINDINGS };
+  for (const [action, defaultValue] of Object.entries(
+    DEFAULT_GAMEPAD_BUTTON_BINDINGS
+  )) {
+    const raw = Number(source?.[action]);
+    if (Number.isFinite(raw)) {
+      result[action] = raw;
+    } else {
+      result[action] = defaultValue;
+    }
+  }
+  return result;
 }
 
 export function initControls({ onVolumeChange, onBindingsChange }) {
@@ -142,6 +152,7 @@ export function initControls({ onVolumeChange, onBindingsChange }) {
   ];
 
   function persistBindings() {
+    currentBindings = normalizeBindingShape(currentBindings);
     localStorage.setItem(
       BINDINGS_STORAGE_KEY,
       JSON.stringify({ ...currentBindings })
