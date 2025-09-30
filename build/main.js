@@ -17,7 +17,12 @@ let clipChunks = [];
 let clipMimeType = "video/webm";
 let clipVideoTracks = [];
 
+const LOG_BUFFER = [];
+const MAX_LOG_ENTRIES = 300;
+
 function bootstrap() {
+  patchConsole();
+
   const { setGamepadStatus, resetClipState } = initControls({
     onVolumeChange(volume) {
       currentVolume = volume;
@@ -36,6 +41,9 @@ function bootstrap() {
     },
     onClipStop() {
       return stopClipRecording();
+    },
+    onExportLogs() {
+      exportLogs();
     },
   });
 
@@ -252,6 +260,82 @@ async function startClipRecording() {
   clipStream = stream;
 
   notifications.show({ icon: "⏺️", message: "Clip recording started" });
+}
+
+function patchConsole() {
+  const original = {
+    log: console.log,
+    info: console.info,
+    warn: console.warn,
+    error: console.error,
+  };
+
+  const appendLog = (level, args) => {
+    const timestamp = new Date().toISOString();
+    const message = args
+      .map((item) => {
+        if (typeof item === "object") {
+          try {
+            return JSON.stringify(item);
+          } catch (err) {
+            return String(item);
+          }
+        }
+        return String(item);
+      })
+      .join(" ");
+    LOG_BUFFER.push({ timestamp, level, message });
+    if (LOG_BUFFER.length > MAX_LOG_ENTRIES) {
+      LOG_BUFFER.shift();
+    }
+  };
+
+  ["log", "info", "warn", "error"].forEach((level) => {
+    console[level] = (...args) => {
+      appendLog(level, args);
+      original[level](...args);
+    };
+  });
+}
+
+function exportLogs() {
+  const contextInfo = {
+    url: window.location.href,
+    userAgent: navigator.userAgent,
+    timestamp: new Date().toISOString(),
+    clipRecording: Boolean(clipRecorder),
+    volume: currentVolume,
+  };
+
+  const header = [
+    "Arcana Mundi Log Export",
+    `Exported: ${contextInfo.timestamp}`,
+    `URL: ${contextInfo.url}`,
+    `User-Agent: ${contextInfo.userAgent}`,
+    `Clip recording active: ${contextInfo.clipRecording}`,
+    `Volume: ${contextInfo.volume.toFixed(2)}`,
+    "",
+    "Entries:",
+    "",
+  ].join("\n");
+
+  const lines = LOG_BUFFER.map(
+    ({ timestamp, level, message }) => `${timestamp} [${level.toUpperCase()}]\n${message}\n`
+  );
+
+  const blob = new Blob([header, ...lines], {
+    type: "text/plain;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `arcana-mundi-logs-${contextInfo.timestamp.replace(/[:.]/g, "-")}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  notifications.show({ icon: "📄", message: "Logs exported" });
 }
 
 async function stopClipRecording() {

@@ -51,6 +51,7 @@ export function initControls({
   onScreenshot,
   onClipStart,
   onClipStop,
+  onExportLogs,
 }) {
   const controlsRoot = document.getElementById("controls");
   const controlsToggle = document.getElementById("controlsToggle");
@@ -63,6 +64,7 @@ export function initControls({
   const gamepadStatus = document.getElementById("gamepadStatus");
   const screenshotButton = document.getElementById("screenshotBtn");
   const clipButton = document.getElementById("clipToggle");
+  const logsButton = document.getElementById("logsBtn");
 
   if (
     !controlsRoot ||
@@ -75,7 +77,8 @@ export function initControls({
     !gamepadPanel ||
     !gamepadStatus ||
     !screenshotButton ||
-    !clipButton
+    !clipButton ||
+    !logsButton
   ) {
     throw new Error("Controls markup missing expected elements");
   }
@@ -104,6 +107,13 @@ export function initControls({
     if (!open) {
       controlPanels.forEach(({ panel, toggle }) => closePanel(panel, toggle));
     }
+    updateToggleLabel(open);
+  }
+
+  function updateToggleLabel(open) {
+    controlsToggle.innerHTML = open
+      ? '⚙️ Controls <span class="caret">▲</span>'
+      : '⚙️ Controls <span class="caret">▼</span>';
   }
 
   function ensureControlsOpen() {
@@ -127,6 +137,8 @@ export function initControls({
       setControlsOpen(false);
     }
   });
+
+  updateToggleLabel(false);
 
   function closePanel(panel, toggle) {
     panel.setAttribute("aria-hidden", "true");
@@ -304,6 +316,22 @@ export function initControls({
     } finally {
       clipButton.disabled = false;
     }
+  });
+
+  logsButton.addEventListener("click", () => {
+    ensureControlsOpen();
+    logsButton.disabled = true;
+    logsButton.textContent = "⏳ Preparing...";
+    Promise.resolve(onExportLogs?.())
+      .catch((err) => {
+        console.warn("Export logs failed", err);
+      })
+      .finally(() => {
+        setTimeout(() => {
+          logsButton.disabled = false;
+          logsButton.textContent = "📄 Export Logs";
+        }, 300);
+      });
   });
 
   document.addEventListener("click", (event) => {

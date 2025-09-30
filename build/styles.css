@@ -56,8 +56,15 @@ body {
   transition: background 0.2s ease, border 0.2s ease;
 }
 
+#controls .control-toggle .caret {
+  font-size: 0.7em;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+  opacity: 0.85;
+}
+
 #controls .control-toggle:hover,
-#controls .control-toggle:focus {
+#controls .control-toggle:focus-visible {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.6);
   outline: none;
