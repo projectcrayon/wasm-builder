@@ -160,6 +160,8 @@ export function initControls({ onVolumeChange, onBindingsChange }) {
     onBindingsChange?.({ ...currentBindings });
   }
 
+  const selectMap = new Map();
+
   gamepadPanel
     .querySelectorAll("[data-gamepad-binding]")
     .forEach((select) => {
@@ -174,11 +176,37 @@ export function initControls({ onVolumeChange, onBindingsChange }) {
       const bindingValue = currentBindings[action] ??
         DEFAULT_GAMEPAD_BUTTON_BINDINGS[action];
       select.value = String(bindingValue);
+      selectMap.set(action, select);
       select.addEventListener("change", (event) => {
+        const newValue = Number(event.target.value);
+        if (!Number.isFinite(newValue)) return;
+        const previousValue = currentBindings[action];
+        if (previousValue === newValue) return;
+
+        const existingEntry = Object.entries(currentBindings).find(
+          ([otherAction, value]) => otherAction !== action && value === newValue
+        );
+
+        if (existingEntry) {
+          const [otherAction] = existingEntry;
+          const fallback = Number.isFinite(previousValue)
+            ? previousValue
+            : DEFAULT_GAMEPAD_BUTTON_BINDINGS[otherAction];
+          currentBindings = {
+            ...currentBindings,
+            [otherAction]: fallback,
+          };
+          const otherSelect = selectMap.get(otherAction);
+          if (otherSelect) {
+            otherSelect.value = String(currentBindings[otherAction]);
+          }
+        }
+
         currentBindings = {
           ...currentBindings,
-          [action]: Number(event.target.value),
+          [action]: newValue,
         };
+
         persistBindings();
       });
     });
