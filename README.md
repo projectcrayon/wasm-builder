@@ -76,7 +76,7 @@ And your `build/main.js` will need to launch the ROM:
 
     run("Micro Mages.nes");
 
-The frontend listens to the Web Gamepad API, so standard controllers (DualSense, Xbox, etc.) Just Works™ alongside the keyboard bindings. Connect the pad before loading the page (or press any button to wake it) and use the bottom-right volume pill to fine-tune audio output.
+The frontend listens to the Web Gamepad API, so standard controllers (DualSense, Xbox, etc.) Just Works™ alongside the keyboard bindings. Connect the pad before loading the page (or press any button to wake it) and use the bottom-right controls to fine-tune volume or remap the main gamepad buttons on the fly.
 
 ## Netlify Deployment
 

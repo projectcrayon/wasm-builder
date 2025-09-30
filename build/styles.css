@@ -1,0 +1,136 @@
+html,
+body,
+#selector {
+  display: block;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  background: black;
+  font-family: sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#wrapper {
+  text-align: center;
+}
+
+#screen {
+  height: 100vh;
+  width: 125vh;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-crisp-edges;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#controls {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  font-family: inherit;
+  color: #fff;
+}
+
+#controls .control-toggle {
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  color: inherit;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s ease, border 0.2s ease;
+}
+
+#controls .control-toggle:hover,
+#controls .control-toggle:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.6);
+  outline: none;
+}
+
+#controls .panel {
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  min-width: 200px;
+  display: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+#controls .panel[aria-hidden="false"] {
+  display: block;
+}
+
+#controls .panel label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: inherit;
+}
+
+#controls .panel select {
+  background: rgba(25, 25, 25, 0.85);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  padding: 0.25rem 0.35rem;
+}
+
+#controls .panel select:hover {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+#controls .panel select:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 1px;
+}
+
+#controls .panel-status {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+#controls .panel-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+#volumeSlider {
+  width: 120px;
+}
+
+#gamepadPanel .binding-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem 1rem;
+}
+
+#gamepadPanel .binding-grid label {
+  font-size: 0.78rem;
+}
+
+#gamepadPanel select {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  #gamepadPanel .binding-grid {
+    grid-template-columns: 1fr;
+  }
+}

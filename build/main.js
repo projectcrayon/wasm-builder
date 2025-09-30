@@ -1,337 +1,67 @@
-// All comments in English as requested.
-
 import Video from "./vendors/Video.js";
 import Audio from "./vendors/Audio.js";
+import { initControls } from "./controls.js";
+import { InputManager, NO_GAMEPAD_STATUS } from "./input-manager.js";
 
-const mapping = {
-  KeyZ: 0, // RETRO_DEVICE_ID_JOYPAD_B
-  KeyA: 1, // RETRO_DEVICE_ID_JOYPAD_Y
-  ShiftRight: 2, // RETRO_DEVICE_ID_JOYPAD_SELECT
-  Enter: 3, // RETRO_DEVICE_ID_JOYPAD_START
-  ArrowUp: 4, // RETRO_DEVICE_ID_JOYPAD_UP
-  ArrowDown: 5, // RETRO_DEVICE_ID_JOYPAD_DOWN
-  ArrowLeft: 6, // RETRO_DEVICE_ID_JOYPAD_LEFT
-  ArrowRight: 7, // RETRO_DEVICE_ID_JOYPAD_RIGHT
-  KeyX: 8, // RETRO_DEVICE_ID_JOYPAD_A
-  KeyS: 9, // RETRO_DEVICE_ID_JOYPAD_X
-  KeyQ: 10, // RETRO_DEVICE_ID_JOYPAD_L
-  KeyW: 11, // RETRO_DEVICE_ID_JOYPAD_R
-};
+const Module = window.Module || (window.Module = {});
+const ROM_FILE = "rom.bin";
 
-let sram = null;
-let savestate = null;
-let paused = false;
-let audioUnlockHandlersBound = false;
-let gamepadIndex = null;
-let gamepadFrameHandle = null;
-let retroForGamepad = null;
+const inputManager = new InputManager({ moduleRef: Module });
+let currentVolume = 0.5;
 
-const MAX_INPUTS = 32;
-const keyboardState = new Array(MAX_INPUTS).fill(false);
-const gamepadState = new Array(MAX_INPUTS).fill(false);
-
-function updateInputIndices(retro, indices) {
-  const state = retro.input_user_state?.[0];
-  if (!state) return;
-  for (const index of indices) {
-    if (index == null || index >= state.length) continue;
-    const kb = keyboardState[index] ?? false;
-    const gp = gamepadState[index] ?? false;
-    state[index] = kb || gp;
-  }
-}
-
-function updateAllInputs(retro) {
-  updateInputIndices(retro, TRACKED_INPUTS);
-}
-
-function unlockAudioContext() {
-  const ctx = Module.audio?.ctx;
-  if (!ctx) return;
-  if (ctx.state !== "suspended") return;
-  ctx.resume().catch((err) => {
-    console.warn("Audio context resume blocked:", err);
-  });
-}
-
-function listenKeyboard(retro) {
-  if (!audioUnlockHandlersBound) {
-    window.addEventListener("pointerdown", unlockAudioContext, { once: true });
-    audioUnlockHandlersBound = true;
-  }
-
-  window.addEventListener("keydown", (e) => {
-    const volumePanel = document.getElementById("volumePanel");
-    const volumeToggle = document.getElementById("volumeToggle");
-
-    if (
-      volumePanel &&
-      volumePanel.getAttribute("aria-hidden") === "false" &&
-      (volumePanel.contains(e.target) || e.target === volumeToggle)
-    ) {
-      if (e.code === "Escape") {
-        volumePanel.setAttribute("aria-hidden", "true");
-        volumeToggle?.setAttribute("aria-expanded", "false");
-        e.preventDefault();
+function bootstrap() {
+  const { setGamepadStatus } = initControls({
+    onVolumeChange(volume) {
+      currentVolume = volume;
+      if (Module.audio) {
+        Module.audio.volume = volume;
       }
-      return;
-    }
-
-    // Prevent default to avoid scrolling etc.
-    e.preventDefault();
-    unlockAudioContext();
-    if (Object.prototype.hasOwnProperty.call(mapping, e.code)) {
-      const idx = mapping[e.code];
-      keyboardState[idx] = true;
-      updateInputIndices(retro, [idx]);
-    }
+    },
+    onBindingsChange(bindings) {
+      inputManager.updateBindings(bindings);
+    },
   });
 
-  window.addEventListener("keyup", (e) => {
-    const volumePanel = document.getElementById("volumePanel");
-    if (
-      volumePanel &&
-      volumePanel.getAttribute("aria-hidden") === "false" &&
-      volumePanel.contains(e.target)
-    ) {
-      return;
-    }
-    e.preventDefault();
-    if (Object.prototype.hasOwnProperty.call(mapping, e.code)) {
-      const idx = mapping[e.code];
-      keyboardState[idx] = false;
-      updateInputIndices(retro, [idx]);
-    }
+  inputManager.setGamepadStatusCallback((text) => {
+    setGamepadStatus(text ?? NO_GAMEPAD_STATUS);
   });
+  setGamepadStatus(NO_GAMEPAD_STATUS);
 
-  window.addEventListener("keydown", (e) => {
-    const volumePanel = document.getElementById("volumePanel");
-    const volumeToggle = document.getElementById("volumeToggle");
-
-    if (
-      volumePanel &&
-      volumePanel.getAttribute("aria-hidden") === "false" &&
-      (volumePanel.contains(e.target) || e.target === volumeToggle)
-    ) {
-      if (e.code === "Escape") {
-        volumePanel.setAttribute("aria-hidden", "true");
-        volumeToggle?.setAttribute("aria-expanded", "false");
-        e.preventDefault();
-      }
-      return;
-    }
-    e.preventDefault();
-    if (e.code === "KeyF") {
-      const wrapper = document.querySelector("#wrapper");
-      wrapper.webkitRequestFullScreen && wrapper.webkitRequestFullScreen();
-      wrapper.mozRequestFullScreen && wrapper.mozRequestFullScreen();
-      wrapper.requestFullscreen && wrapper.requestFullscreen();
-    }
-    if (e.code === "KeyR") {
-      // Reset
-      retro.reset();
-      if (sram !== null && sram.length > 0) retro.setSRAM(sram);
-    }
-    if (e.code === "KeyY") {
-      // Save state
-      savestate = retro.getState();
-    }
-    if (e.code === "KeyU") {
-      // Load state
-      retro.setState(savestate);
-    }
-    if (e.code === "KeyG") {
-      // Screenshot
-      const canvas = document.querySelector("#screen");
-      const dataURL = canvas.toDataURL("image/png");
-      console.log("Screenshot data URL:", dataURL);
-      const img = document.createElement("img");
-      img.src = dataURL;
-      document.body.appendChild(img);
-    }
-    if (e.code === "KeyH") {
-      // Savefile (SRAM)
-      sram = retro.getSRAM();
-      console.log("SRAM length:", sram?.length ?? 0);
-    }
-    if (e.code === "KeyP") {
-      // Pause/resume
-      paused = !paused;
-      console.log("Paused:", paused);
-      retro.setPaused(paused);
-    }
-    if (e.code === "Escape") {
-      const panel = document.getElementById("volumePanel");
-      const toggle = document.getElementById("volumeToggle");
-      if (panel && panel.getAttribute("aria-hidden") === "false") {
-        panel.setAttribute("aria-hidden", "true");
-        toggle?.setAttribute("aria-expanded", "false");
-        return;
-      }
-      keyboardState.fill(false);
-      gamepadState.fill(false);
-      updateAllInputs(retro);
-      // Unload game on explicit request
-      retro.unloadGame();
-    }
-  });
-  updateAllInputs(retro);
+  startGame();
 }
 
-const GAMEPAD_BUTTON_MAP = {
-  0: 0, // Cross -> B
-  1: 8, // Circle -> A
-  2: 9, // Triangle -> X
-  3: 1, // Square -> Y
-  4: 10, // L1 -> L
-  5: 11, // R1 -> R
-  8: 2, // Share -> Select
-  9: 3, // Options -> Start
-  10: 10, // L3 -> L (fallback)
-  11: 11, // R3 -> R (fallback)
-};
-
-const GAMEPAD_DPAD_MAP = {
-  12: 4, // Up
-  13: 5, // Down
-  14: 6, // Left
-  15: 7, // Right
-};
-
-const GAMEPAD_AXIS_MAP = [
-  { axis: 0, negative: 6, positive: 7 },
-  { axis: 1, negative: 4, positive: 5 },
-];
-
-const AXIS_THRESHOLD = 0.35;
-
-const TRACKED_INPUTS = Array.from(
-  new Set([
-    ...Object.values(mapping),
-    ...Object.values(GAMEPAD_BUTTON_MAP),
-    ...Object.values(GAMEPAD_DPAD_MAP),
-    ...GAMEPAD_AXIS_MAP.flatMap((mapping) => [mapping.negative, mapping.positive]),
-  ])
-).sort((a, b) => a - b);
-
-function pollGamepad() {
-  if (gamepadIndex == null || !retroForGamepad) return;
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-  const pad = pads?.[gamepadIndex];
-  if (!pad) {
-    gamepadIndex = null;
-    gamepadState.fill(false);
-    updateAllInputs(retroForGamepad);
-    return;
-  }
-
-  gamepadState.fill(false);
-
-  pad.buttons.forEach((button, index) => {
-    if (!button) return;
-    const active = typeof button === "object" ? button.pressed : button === 1;
-    if (!active) return;
-    const target = GAMEPAD_BUTTON_MAP[index] ?? GAMEPAD_DPAD_MAP[index];
-    if (target != null) {
-      gamepadState[target] = true;
-    }
-  });
-
-  for (const mapping of GAMEPAD_AXIS_MAP) {
-    const value = pad.axes?.[mapping.axis] ?? 0;
-    if (value <= -AXIS_THRESHOLD) {
-      gamepadState[mapping.negative] = true;
-    } else if (value >= AXIS_THRESHOLD) {
-      gamepadState[mapping.positive] = true;
-    }
-  }
-
-  updateAllInputs(retroForGamepad);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootstrap);
+} else {
+  bootstrap();
 }
 
-function gamepadLoop() {
-  pollGamepad();
-  gamepadFrameHandle = window.requestAnimationFrame(gamepadLoop);
+function startGame() {
+  const run = () => runGame(ROM_FILE);
+  if (document.readyState === "complete") {
+    run();
+  } else {
+    window.addEventListener("load", run, { once: true });
+  }
 }
 
-function attachGamepad(retro) {
-  retroForGamepad = retro;
-
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-  if (pads) {
-    for (const pad of pads) {
-      if (pad) {
-        gamepadIndex = pad.index;
-        break;
-      }
-    }
-  }
-
-  if (gamepadFrameHandle) {
-    window.cancelAnimationFrame(gamepadFrameHandle);
-    gamepadFrameHandle = null;
-  }
-
-  if (gamepadIndex != null) {
-    gamepadLoop();
-  }
-
-  updateAllInputs(retro);
-}
-
-window.addEventListener("gamepadconnected", (event) => {
-  gamepadIndex = event.gamepad.index;
-  gamepadState.fill(false);
-  if (retroForGamepad) {
-    updateAllInputs(retroForGamepad);
-  }
-  if (retroForGamepad && !gamepadFrameHandle) {
-    gamepadLoop();
-  }
-});
-
-window.addEventListener("gamepaddisconnected", (event) => {
-  if (event.gamepad.index !== gamepadIndex) return;
-  gamepadIndex = null;
-  if (gamepadFrameHandle) {
-    window.cancelAnimationFrame(gamepadFrameHandle);
-    gamepadFrameHandle = null;
-  }
-  gamepadState.fill(false);
-  if (retroForGamepad) {
-    updateAllInputs(retroForGamepad);
-  }
-});
-
-// Export run() globally so index.html can call it.
-window.run = function (gamePath) {
+function runGame(gamePath) {
   const canvas = document.querySelector("#screen");
+  if (!canvas) throw new Error("Canvas with id 'screen' not found");
+
   const video = new Video(canvas);
   const audio = new Audio();
 
-  if (typeof window.arcanaVolume === "number") {
-    const presetVolume = Math.min(Math.max(window.arcanaVolume, 0), 1);
-    audio.volume = presetVolume;
-  }
-
-  // Wire video/audio for the libretro runtime
   Module.video = video;
   Module.audio = audio;
+  Module.audio.volume = currentVolume;
 
-  // Load the BlastEm core (injected by blastem_libretro.js)
   libretro(Module).then((retro) => {
-    // Remove NES-specific options. If you need BlastEm options, set them here, e.g.:
-    // retro.setOptions("blastem_region", "auto"); // example key if supported
-
-    // Load packaged ROM file
     retro.loadGame(gamePath);
 
-    // Optional: pick a suitable controller if core exposes choices.
-    // If unknown, fallback to the first available option.
     try {
       const infoMap = retro.env_controller_info?.[0];
       if (infoMap && typeof infoMap.keys === "function") {
-        // Try common Genesis/Mega Drive names in order
         const preferredNames = [
           "Sega Mega Drive 6 Button Pad",
           "Sega Mega Drive Controller",
@@ -348,8 +78,7 @@ window.run = function (gamePath) {
           }
         }
         if (!chosenName) {
-          const first = [...infoMap.keys()][0];
-          chosenName = first;
+          chosenName = [...infoMap.keys()][0];
         }
         const controllerId = infoMap.get(chosenName);
         if (controllerId != null) {
@@ -357,24 +86,16 @@ window.run = function (gamePath) {
           console.log("Controller set:", chosenName, controllerId);
         }
       }
-    } catch (e) {
-      console.warn("Controller selection skipped:", e);
+    } catch (err) {
+      console.warn("Controller selection skipped:", err);
     }
 
-    listenKeyboard(retro);
-    keyboardState.fill(false);
-    gamepadState.fill(false);
-    updateAllInputs(retro);
-    attachGamepad(retro);
+    inputManager.attachRetro(retro);
 
     if (retro.skip_frame) {
-      // keep a single frame for testing purpose (optional)
       retro.skip_frame(1);
     }
 
-    // Start the main loop
     retro.loop(-1);
-
-    unlockAudioContext();
   });
-};
+}
