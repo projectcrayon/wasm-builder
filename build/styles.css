@@ -41,6 +41,10 @@ body {
   color: #fff;
 }
 
+#controlsToggle {
+  backdrop-filter: blur(6px);
+}
+
 #controls .control-toggle {
   background: rgba(0, 0, 0, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.35);
@@ -64,9 +68,30 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 12px;
   padding: 0.75rem 1rem;
-  min-width: 200px;
+  min-width: 170px;
+  max-width: 210px;
   display: none;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+#controls .controls-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px) scale(0.98);
+  transition: opacity 160ms ease, transform 180ms ease;
+  max-height: 0;
+  overflow: hidden;
+}
+
+#controls[data-open="true"] .controls-group {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+  max-height: 600px;
 }
 
 #controls .panel[aria-hidden="false"] {
@@ -88,6 +113,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 6px;
   padding: 0.25rem 0.35rem;
+  width: 100%;
 }
 
 #controls .panel select:hover {
@@ -117,20 +143,40 @@ body {
 
 #gamepadPanel .binding-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.6rem 1rem;
+  grid-template-columns: 1fr;
+  gap: 0.5rem 0.75rem;
 }
 
 #gamepadPanel .binding-grid label {
   font-size: 0.78rem;
 }
 
-#gamepadPanel select {
-  width: 100%;
+#notification-stack {
+  pointer-events: none;
+  position: fixed;
+  right: 1.5rem;
+  top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 1000;
 }
 
-@media (max-width: 720px) {
-  #gamepadPanel .binding-grid {
-    grid-template-columns: 1fr;
-  }
+#notification-stack .toast {
+  background: rgba(20, 20, 20, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  color: #fff;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+#notification-stack .toast.visible {
+  opacity: 1;
+  transform: translateY(0);
 }

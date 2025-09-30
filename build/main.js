@@ -2,12 +2,14 @@ import Video from "./vendors/Video.js";
 import Audio from "./vendors/Audio.js";
 import { initControls } from "./controls.js";
 import { InputManager, NO_GAMEPAD_STATUS } from "./input-manager.js";
+import { NotificationManager } from "./notifications.js";
 
 const Module = window.Module || (window.Module = {});
 const ROM_FILE = "rom.bin";
 
 const inputManager = new InputManager({ moduleRef: Module });
 let currentVolume = 0.5;
+const notifications = new NotificationManager();
 
 function bootstrap() {
   const { setGamepadStatus } = initControls({
@@ -19,6 +21,9 @@ function bootstrap() {
     },
     onBindingsChange(bindings) {
       inputManager.updateBindings(bindings);
+    },
+    onScreenshot() {
+      captureScreenshot();
     },
   });
 
@@ -98,4 +103,45 @@ function runGame(gamePath) {
 
     retro.loop(-1);
   });
+}
+
+async function captureScreenshot() {
+  const canvas = document.querySelector("#screen");
+  if (!canvas) {
+    const error = new Error("Screenshot aborted: canvas not found");
+    console.warn(error.message);
+    throw error;
+  }
+
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+
+  const dataURL = canvas.toDataURL("image/png");
+  const response = await fetch(dataURL);
+  const blob = await response.blob();
+
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[:.]/g, "-");
+  const link = document.createElement("a");
+  link.href = dataURL;
+  link.download = `arcana-mundi-${timestamp}.png`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": blob }),
+    ]);
+    notifications.show({
+      message: "Screenshot copied to clipboard",
+      icon: "📋",
+    });
+  } catch (err) {
+    console.warn("Clipboard copy failed", err);
+    notifications.show({
+      message: "Screenshot saved locally",
+      icon: "⚠️",
+    });
+  }
 }

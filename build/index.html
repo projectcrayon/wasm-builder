@@ -16,56 +16,71 @@
     <div id="wrapper">
       <canvas id="screen"></canvas>
     </div>
-    <div id="controls">
-      <button id="volumeToggle" class="control-toggle" type="button" aria-controls="volumePanel" aria-expanded="false" title="Volume">
-        🔊 Volume
+    <div id="controls" data-open="false">
+      <button
+        id="controlsToggle"
+        class="control-toggle primary"
+        type="button"
+        aria-expanded="false"
+        aria-controls="controlsGroup"
+        title="Toggle control drawer"
+      >
+        ⚙️ Controls
       </button>
-      <div id="volumePanel" class="panel" role="group" aria-hidden="true">
-        <label for="volumeSlider">
-          Volume
-          <input id="volumeSlider" type="range" min="0" max="100" step="5" value="100" />
-        </label>
-      </div>
-      <button id="gamepadToggle" class="control-toggle" type="button" aria-controls="gamepadPanel" aria-expanded="false" title="Gamepad settings">
-        🎮 Gamepad
-      </button>
-      <div id="gamepadPanel" class="panel" role="group" aria-hidden="true">
-        <p id="gamepadStatus" class="panel-status"></p>
-        <div class="binding-grid">
-          <label>
-            Primary (B)
-            <select data-gamepad-binding="primary"></select>
-          </label>
-          <label>
-            Secondary (A)
-            <select data-gamepad-binding="secondary"></select>
-          </label>
-          <label>
-            Tertiary (X)
-            <select data-gamepad-binding="tertiary"></select>
-          </label>
-          <label>
-            Quaternary (Y)
-            <select data-gamepad-binding="quaternary"></select>
-          </label>
-          <label>
-            Select
-            <select data-gamepad-binding="select"></select>
-          </label>
-          <label>
-            Start
-            <select data-gamepad-binding="start"></select>
-          </label>
-          <label>
-            L
-            <select data-gamepad-binding="l1"></select>
-          </label>
-          <label>
-            R
-            <select data-gamepad-binding="r1"></select>
+      <div id="controlsGroup" class="controls-group" aria-hidden="true">
+        <button id="volumeToggle" class="control-toggle" type="button" aria-controls="volumePanel" aria-expanded="false" title="Volume">
+          🔊 Volume
+        </button>
+        <div id="volumePanel" class="panel" role="group" aria-hidden="true">
+          <label for="volumeSlider">
+            Volume
+            <input id="volumeSlider" type="range" min="0" max="100" step="5" value="100" />
           </label>
         </div>
-        <p class="panel-hint">D-pad stays mapped to the controller's directional pad. Choose a button for each action and press it to test.</p>
+        <button id="gamepadToggle" class="control-toggle" type="button" aria-controls="gamepadPanel" aria-expanded="false" title="Gamepad settings">
+          🎮 Gamepad
+        </button>
+        <div id="gamepadPanel" class="panel" role="group" aria-hidden="true">
+          <p id="gamepadStatus" class="panel-status"></p>
+          <div class="binding-grid">
+            <label>
+              Primary (B)
+              <select data-gamepad-binding="primary"></select>
+            </label>
+            <label>
+              Secondary (A)
+              <select data-gamepad-binding="secondary"></select>
+            </label>
+            <label>
+              Tertiary (X)
+              <select data-gamepad-binding="tertiary"></select>
+            </label>
+            <label>
+              Quaternary (Y)
+              <select data-gamepad-binding="quaternary"></select>
+            </label>
+            <label>
+              Select
+              <select data-gamepad-binding="select"></select>
+            </label>
+            <label>
+              Start
+              <select data-gamepad-binding="start"></select>
+            </label>
+            <label>
+              L
+              <select data-gamepad-binding="l1"></select>
+            </label>
+            <label>
+              R
+              <select data-gamepad-binding="r1"></select>
+            </label>
+          </div>
+          <p class="panel-hint">D-pad stays mapped to the controller's directional pad. Choose a button for each action and press it to test.</p>
+        </div>
+        <button id="screenshotBtn" class="control-toggle" type="button" title="Capture a screenshot">
+          📸 Screenshot
+        </button>
       </div>
     </div>
 
@@ -80,6 +95,10 @@
 
   <script>
     window.Module = window.Module || {};
+    Module.webglContextAttributes = {
+      preserveDrawingBuffer: true,
+      ...(Module.webglContextAttributes || {}),
+    };
   </script>
   <script src="rom.js"></script>
   <script src="wasm/blastem_libretro.js"></script>

@@ -45,21 +45,29 @@ function normalizeBindingShape(source) {
   return result;
 }
 
-export function initControls({ onVolumeChange, onBindingsChange }) {
+export function initControls({ onVolumeChange, onBindingsChange, onScreenshot }) {
+  const controlsRoot = document.getElementById("controls");
+  const controlsToggle = document.getElementById("controlsToggle");
+  const controlsGroup = document.getElementById("controlsGroup");
   const volumeToggle = document.getElementById("volumeToggle");
   const volumePanel = document.getElementById("volumePanel");
   const volumeSlider = document.getElementById("volumeSlider");
   const gamepadToggle = document.getElementById("gamepadToggle");
   const gamepadPanel = document.getElementById("gamepadPanel");
   const gamepadStatus = document.getElementById("gamepadStatus");
+  const screenshotButton = document.getElementById("screenshotBtn");
 
   if (
+    !controlsRoot ||
+    !controlsToggle ||
+    !controlsGroup ||
     !volumeToggle ||
     !volumePanel ||
     !volumeSlider ||
     !gamepadToggle ||
     !gamepadPanel ||
-    !gamepadStatus
+    !gamepadStatus ||
+    !screenshotButton
   ) {
     throw new Error("Controls markup missing expected elements");
   }
@@ -78,6 +86,37 @@ export function initControls({ onVolumeChange, onBindingsChange }) {
       focus: () => gamepadPanel.querySelector("select"),
     },
   ];
+
+  function setControlsOpen(open) {
+    controlsRoot.dataset.open = open ? "true" : "false";
+    controlsToggle.setAttribute("aria-expanded", String(open));
+    controlsGroup.setAttribute("aria-hidden", String(!open));
+    if (!open) {
+      controlPanels.forEach(({ panel, toggle }) => closePanel(panel, toggle));
+    }
+  }
+
+  function ensureControlsOpen() {
+    if (controlsRoot.dataset.open !== "true") {
+      setControlsOpen(true);
+    }
+  }
+
+  controlsToggle.addEventListener("click", () => {
+    const isOpen = controlsRoot.dataset.open === "true";
+    setControlsOpen(!isOpen);
+    if (!isOpen) {
+      controlsGroup.querySelector("button, input, select")?.focus?.({
+        preventScroll: true,
+      });
+    }
+  });
+
+  controlsToggle.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      setControlsOpen(false);
+    }
+  });
 
   function closePanel(panel, toggle) {
     panel.setAttribute("aria-hidden", "true");
@@ -129,6 +168,7 @@ export function initControls({ onVolumeChange, onBindingsChange }) {
   });
 
   volumeToggle.addEventListener("click", () => {
+    ensureControlsOpen();
     togglePanel(volumePanel, volumeToggle, () => volumeSlider);
   });
 
@@ -212,21 +252,42 @@ export function initControls({ onVolumeChange, onBindingsChange }) {
     });
 
   gamepadToggle.addEventListener("click", () => {
+    ensureControlsOpen();
     togglePanel(gamepadPanel, gamepadToggle, () =>
       gamepadPanel.querySelector("select")
     );
   });
 
-  document.addEventListener("click", (event) => {
-    controlPanels.forEach(({ panel, toggle }) => {
-      if (
-        panel.getAttribute("aria-hidden") === "false" &&
-        !panel.contains(event.target) &&
-        !toggle.contains(event.target)
-      ) {
-        closePanel(panel, toggle);
-      }
+  screenshotButton.addEventListener("click", () => {
+    screenshotButton.disabled = true;
+    screenshotButton.textContent = "📸 Capturing...";
+    Promise.resolve(onScreenshot?.()).catch((err) => {
+      console.warn("Screenshot failed", err);
+    }).finally(() => {
+      setTimeout(() => {
+        screenshotButton.disabled = false;
+        screenshotButton.textContent = "📸 Screenshot";
+      }, 250);
     });
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!controlsRoot.contains(event.target)) {
+      setControlsOpen(false);
+      return;
+    }
+
+    if (controlsRoot.dataset.open === "true") {
+      controlPanels.forEach(({ panel, toggle }) => {
+        if (
+          panel.getAttribute("aria-hidden") === "false" &&
+          !panel.contains(event.target) &&
+          !toggle.contains(event.target)
+        ) {
+          closePanel(panel, toggle);
+        }
+      });
+    }
   });
 
   applyVolume(currentVolume);
