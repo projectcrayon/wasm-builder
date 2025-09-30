@@ -10,9 +10,15 @@ const ROM_FILE = "rom.bin";
 const inputManager = new InputManager({ moduleRef: Module });
 let currentVolume = 0.5;
 const notifications = new NotificationManager();
+let resetClipButtonState = () => {};
+let clipRecorder = null;
+let clipStream = null;
+let clipChunks = [];
+let clipMimeType = "video/webm";
+let clipVideoTracks = [];
 
 function bootstrap() {
-  const { setGamepadStatus } = initControls({
+  const { setGamepadStatus, resetClipState } = initControls({
     onVolumeChange(volume) {
       currentVolume = volume;
       if (Module.audio) {
@@ -25,7 +31,15 @@ function bootstrap() {
     onScreenshot() {
       captureScreenshot();
     },
+    onClipStart() {
+      return startClipRecording();
+    },
+    onClipStop() {
+      return stopClipRecording();
+    },
   });
+
+  resetClipButtonState = resetClipState;
 
   inputManager.setGamepadStatusCallback((text) => {
     setGamepadStatus(text ?? NO_GAMEPAD_STATUS);
@@ -60,6 +74,7 @@ function runGame(gamePath) {
   Module.video = video;
   Module.audio = audio;
   Module.audio.volume = currentVolume;
+  ensureAudioContext(audio);
 
   libretro(Module).then((retro) => {
     retro.loadGame(gamePath);
@@ -144,4 +159,186 @@ async function captureScreenshot() {
       icon: "⚠️",
     });
   }
+}
+
+async function startClipRecording() {
+  if (clipRecorder) {
+    throw new Error("A clip recording is already in progress");
+  }
+
+  const canvas = document.querySelector("#screen");
+  if (!canvas) {
+    notifications.show({ icon: "⚠️", message: "Clip failed: canvas missing" });
+    throw new Error("Canvas missing");
+  }
+
+  const captureStream =
+    canvas.captureStream?.(60) || canvas.captureStream?.() || canvas.mozCaptureStream?.(60);
+
+  if (!captureStream) {
+    notifications.show({
+      icon: "⚠️",
+      message: "Clip recording not supported in this browser",
+    });
+    throw new Error("captureStream not supported");
+  }
+
+  const audioStream = Module.audio?.getMediaStream?.();
+  const combinedStream = new MediaStream();
+
+  clipVideoTracks = captureStream.getVideoTracks();
+  clipVideoTracks.forEach((track) => combinedStream.addTrack(track));
+
+  const audioTracks = audioStream?.getAudioTracks?.() || [];
+  audioTracks.forEach((track) => combinedStream.addTrack(track));
+
+  if (audioTracks.length === 0) {
+    notifications.show({ icon: "ℹ️", message: "Clip will be video-only" });
+  }
+
+  const stream = combinedStream;
+  clipChunks = [];
+
+  const mimeCandidates = [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ];
+
+  let recorder;
+  for (const mime of mimeCandidates) {
+    if (typeof MediaRecorder === "undefined") break;
+    if (MediaRecorder.isTypeSupported && !MediaRecorder.isTypeSupported(mime)) continue;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType: mime });
+      clipMimeType = mime;
+      break;
+    } catch (err) {
+      continue;
+    }
+  }
+
+  if (!recorder) {
+    clipVideoTracks.forEach((track) => track.stop());
+    clipVideoTracks = [];
+    notifications.show({
+      icon: "⚠️",
+      message: "MediaRecorder not supported",
+    });
+    throw new Error("Unable to create MediaRecorder");
+  }
+
+  recorder.ondataavailable = (event) => {
+    if (event.data && event.data.size > 0) {
+      clipChunks.push(event.data);
+    }
+  };
+
+  recorder.onerror = (event) => {
+    console.warn("Clip recorder error", event.error);
+    notifications.show({ icon: "⚠️", message: "Clip recording error" });
+  };
+
+  try {
+    recorder.start();
+  } catch (err) {
+    clipVideoTracks.forEach((track) => track.stop());
+    clipVideoTracks = [];
+    notifications.show({ icon: "⚠️", message: "Unable to start clip recording" });
+    throw err;
+  }
+
+  clipRecorder = recorder;
+  clipStream = stream;
+
+  notifications.show({ icon: "⏺️", message: "Clip recording started" });
+}
+
+async function stopClipRecording() {
+  if (!clipRecorder) {
+    throw new Error("No active clip recording");
+  }
+
+  const recorder = clipRecorder;
+  const stream = clipStream;
+  clipRecorder = null;
+  clipStream = null;
+
+  return new Promise((resolve, reject) => {
+    recorder.onstop = () => {
+      try {
+        const blob = new Blob(clipChunks, { type: clipMimeType });
+        clipChunks = [];
+        const url = URL.createObjectURL(blob);
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-");
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `arcana-mundi-${timestamp}.webm`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        notifications.show({ icon: "💾", message: "Clip saved (webm)" });
+        resolve();
+      } catch (err) {
+        reject(err);
+      } finally {
+        clipVideoTracks.forEach((track) => track.stop());
+        clipVideoTracks = [];
+        clipChunks = [];
+        resetClipButtonState();
+      }
+    };
+
+    recorder.onerror = (event) => {
+      clipVideoTracks.forEach((track) => track.stop());
+      clipVideoTracks = [];
+      clipChunks = [];
+      notifications.show({ icon: "⚠️", message: "Clip recording failed" });
+      resetClipButtonState();
+      reject(event.error || new Error("Recorder error"));
+    };
+
+    try {
+      recorder.stop();
+    } catch (err) {
+      recorder.onstop = null;
+      recorder.onerror = null;
+      clipVideoTracks.forEach((track) => track.stop());
+      clipVideoTracks = [];
+      clipChunks = [];
+      notifications.show({ icon: "⚠️", message: "Unable to stop clip" });
+      resetClipButtonState();
+      reject(err);
+    }
+  });
+}
+
+function ensureAudioContext(audio) {
+  const ctx = audio?.ctx;
+  if (!ctx) return;
+
+  const tryResume = () => {
+    if (ctx.state === "running") {
+      cleanup();
+      return;
+    }
+    ctx.resume().catch(() => {});
+  };
+
+  let intervalId;
+  const cleanup = () => {
+    document.removeEventListener("pointerdown", tryResume, true);
+    document.removeEventListener("keydown", tryResume, true);
+    if (intervalId != null) {
+      clearInterval(intervalId);
+    }
+  };
+
+  document.addEventListener("pointerdown", tryResume, true);
+  document.addEventListener("keydown", tryResume, true);
+  intervalId = setInterval(tryResume, 2000);
+  tryResume();
 }

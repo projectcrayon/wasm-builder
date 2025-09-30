@@ -45,7 +45,13 @@ function normalizeBindingShape(source) {
   return result;
 }
 
-export function initControls({ onVolumeChange, onBindingsChange, onScreenshot }) {
+export function initControls({
+  onVolumeChange,
+  onBindingsChange,
+  onScreenshot,
+  onClipStart,
+  onClipStop,
+}) {
   const controlsRoot = document.getElementById("controls");
   const controlsToggle = document.getElementById("controlsToggle");
   const controlsGroup = document.getElementById("controlsGroup");
@@ -56,6 +62,7 @@ export function initControls({ onVolumeChange, onBindingsChange, onScreenshot })
   const gamepadPanel = document.getElementById("gamepadPanel");
   const gamepadStatus = document.getElementById("gamepadStatus");
   const screenshotButton = document.getElementById("screenshotBtn");
+  const clipButton = document.getElementById("clipToggle");
 
   if (
     !controlsRoot ||
@@ -67,7 +74,8 @@ export function initControls({ onVolumeChange, onBindingsChange, onScreenshot })
     !gamepadToggle ||
     !gamepadPanel ||
     !gamepadStatus ||
-    !screenshotButton
+    !screenshotButton ||
+    !clipButton
   ) {
     throw new Error("Controls markup missing expected elements");
   }
@@ -86,6 +94,8 @@ export function initControls({ onVolumeChange, onBindingsChange, onScreenshot })
       focus: () => gamepadPanel.querySelector("select"),
     },
   ];
+
+  let clipRecording = false;
 
   function setControlsOpen(open) {
     controlsRoot.dataset.open = open ? "true" : "false";
@@ -271,6 +281,31 @@ export function initControls({ onVolumeChange, onBindingsChange, onScreenshot })
     });
   });
 
+  clipButton.addEventListener("click", async () => {
+    ensureControlsOpen();
+    clipButton.disabled = true;
+    try {
+      if (!clipRecording) {
+        await Promise.resolve(onClipStart?.());
+        clipRecording = true;
+        clipButton.classList.add("active");
+        clipButton.textContent = "⏹️ Stop Clip";
+      } else {
+        await Promise.resolve(onClipStop?.());
+        clipRecording = false;
+        clipButton.classList.remove("active");
+        clipButton.textContent = "🎬 Start Clip";
+      }
+    } catch (err) {
+      console.warn("Clip toggle failed", err);
+      clipRecording = false;
+      clipButton.classList.remove("active");
+      clipButton.textContent = "🎬 Start Clip";
+    } finally {
+      clipButton.disabled = false;
+    }
+  });
+
   document.addEventListener("click", (event) => {
     if (!controlsRoot.contains(event.target)) {
       setControlsOpen(false);
@@ -296,6 +331,11 @@ export function initControls({ onVolumeChange, onBindingsChange, onScreenshot })
   return {
     setGamepadStatus(text) {
       gamepadStatus.textContent = text || DEFAULT_STATUS;
+    },
+    resetClipState() {
+      clipRecording = false;
+      clipButton.classList.remove("active");
+      clipButton.textContent = "🎬 Start Clip";
     },
   };
 }

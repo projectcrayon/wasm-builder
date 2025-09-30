@@ -9,7 +9,12 @@ export default class Audio {
       0,
       this.numChannels
     );
-    this.node.connect(this.ctx.destination);
+    this.outputGain = this.ctx.createGain();
+    this.node.connect(this.outputGain);
+    this.outputGain.connect(this.ctx.destination);
+
+    this.mediaStreamDestination = this.ctx.createMediaStreamDestination();
+    this.outputGain.connect(this.mediaStreamDestination);
 
     this.minBufferSize = this.numSamples * this.numChannels;
     this.maxBufferSize = 4096 * this.numChannels;
@@ -115,6 +120,10 @@ export default class Audio {
 
   pushSampleBatch(samples) {
     this.writeAudioNoCallback(samples);
+  }
+
+  getMediaStream() {
+    return this.mediaStreamDestination?.stream || null;
   }
 }
 
