@@ -76,6 +76,8 @@ And your `build/main.js` will need to launch the ROM:
 
     run("Micro Mages.nes");
 
+The frontend listens to the Web Gamepad API, so standard controllers (DualSense, Xbox, etc.) Just Works™ alongside the keyboard bindings. Connect the pad before loading the page (or press any button to wake it) and use the bottom-right volume pill to fine-tune audio output.
+
 ## Netlify Deployment
 
 1. Activate the correct Emscripten SDK (`source ~/emsdk/emsdk_env.sh`) and rebuild the core you want to host, targeting the publish directory:

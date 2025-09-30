@@ -22,6 +22,28 @@ let sram = null;
 let savestate = null;
 let paused = false;
 let audioUnlockHandlersBound = false;
+let gamepadIndex = null;
+let gamepadFrameHandle = null;
+let retroForGamepad = null;
+
+const MAX_INPUTS = 32;
+const keyboardState = new Array(MAX_INPUTS).fill(false);
+const gamepadState = new Array(MAX_INPUTS).fill(false);
+
+function updateInputIndices(retro, indices) {
+  const state = retro.input_user_state?.[0];
+  if (!state) return;
+  for (const index of indices) {
+    if (index == null || index >= state.length) continue;
+    const kb = keyboardState[index] ?? false;
+    const gp = gamepadState[index] ?? false;
+    state[index] = kb || gp;
+  }
+}
+
+function updateAllInputs(retro) {
+  updateInputIndices(retro, TRACKED_INPUTS);
+}
 
 function unlockAudioContext() {
   const ctx = Module.audio?.ctx;
@@ -59,7 +81,9 @@ function listenKeyboard(retro) {
     e.preventDefault();
     unlockAudioContext();
     if (Object.prototype.hasOwnProperty.call(mapping, e.code)) {
-      retro.input_user_state[0][mapping[e.code]] = true;
+      const idx = mapping[e.code];
+      keyboardState[idx] = true;
+      updateInputIndices(retro, [idx]);
     }
   });
 
@@ -74,7 +98,9 @@ function listenKeyboard(retro) {
     }
     e.preventDefault();
     if (Object.prototype.hasOwnProperty.call(mapping, e.code)) {
-      retro.input_user_state[0][mapping[e.code]] = false;
+      const idx = mapping[e.code];
+      keyboardState[idx] = false;
+      updateInputIndices(retro, [idx]);
     }
   });
 
@@ -142,11 +168,140 @@ function listenKeyboard(retro) {
         toggle?.setAttribute("aria-expanded", "false");
         return;
       }
+      keyboardState.fill(false);
+      gamepadState.fill(false);
+      updateAllInputs(retro);
       // Unload game on explicit request
       retro.unloadGame();
     }
   });
+  updateAllInputs(retro);
 }
+
+const GAMEPAD_BUTTON_MAP = {
+  0: 0, // Cross -> B
+  1: 8, // Circle -> A
+  2: 9, // Triangle -> X
+  3: 1, // Square -> Y
+  4: 10, // L1 -> L
+  5: 11, // R1 -> R
+  8: 2, // Share -> Select
+  9: 3, // Options -> Start
+  10: 10, // L3 -> L (fallback)
+  11: 11, // R3 -> R (fallback)
+};
+
+const GAMEPAD_DPAD_MAP = {
+  12: 4, // Up
+  13: 5, // Down
+  14: 6, // Left
+  15: 7, // Right
+};
+
+const GAMEPAD_AXIS_MAP = [
+  { axis: 0, negative: 6, positive: 7 },
+  { axis: 1, negative: 4, positive: 5 },
+];
+
+const AXIS_THRESHOLD = 0.35;
+
+const TRACKED_INPUTS = Array.from(
+  new Set([
+    ...Object.values(mapping),
+    ...Object.values(GAMEPAD_BUTTON_MAP),
+    ...Object.values(GAMEPAD_DPAD_MAP),
+    ...GAMEPAD_AXIS_MAP.flatMap((mapping) => [mapping.negative, mapping.positive]),
+  ])
+).sort((a, b) => a - b);
+
+function pollGamepad() {
+  if (gamepadIndex == null || !retroForGamepad) return;
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const pad = pads?.[gamepadIndex];
+  if (!pad) {
+    gamepadIndex = null;
+    gamepadState.fill(false);
+    updateAllInputs(retroForGamepad);
+    return;
+  }
+
+  gamepadState.fill(false);
+
+  pad.buttons.forEach((button, index) => {
+    if (!button) return;
+    const active = typeof button === "object" ? button.pressed : button === 1;
+    if (!active) return;
+    const target = GAMEPAD_BUTTON_MAP[index] ?? GAMEPAD_DPAD_MAP[index];
+    if (target != null) {
+      gamepadState[target] = true;
+    }
+  });
+
+  for (const mapping of GAMEPAD_AXIS_MAP) {
+    const value = pad.axes?.[mapping.axis] ?? 0;
+    if (value <= -AXIS_THRESHOLD) {
+      gamepadState[mapping.negative] = true;
+    } else if (value >= AXIS_THRESHOLD) {
+      gamepadState[mapping.positive] = true;
+    }
+  }
+
+  updateAllInputs(retroForGamepad);
+}
+
+function gamepadLoop() {
+  pollGamepad();
+  gamepadFrameHandle = window.requestAnimationFrame(gamepadLoop);
+}
+
+function attachGamepad(retro) {
+  retroForGamepad = retro;
+
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  if (pads) {
+    for (const pad of pads) {
+      if (pad) {
+        gamepadIndex = pad.index;
+        break;
+      }
+    }
+  }
+
+  if (gamepadFrameHandle) {
+    window.cancelAnimationFrame(gamepadFrameHandle);
+    gamepadFrameHandle = null;
+  }
+
+  if (gamepadIndex != null) {
+    gamepadLoop();
+  }
+
+  updateAllInputs(retro);
+}
+
+window.addEventListener("gamepadconnected", (event) => {
+  gamepadIndex = event.gamepad.index;
+  gamepadState.fill(false);
+  if (retroForGamepad) {
+    updateAllInputs(retroForGamepad);
+  }
+  if (retroForGamepad && !gamepadFrameHandle) {
+    gamepadLoop();
+  }
+});
+
+window.addEventListener("gamepaddisconnected", (event) => {
+  if (event.gamepad.index !== gamepadIndex) return;
+  gamepadIndex = null;
+  if (gamepadFrameHandle) {
+    window.cancelAnimationFrame(gamepadFrameHandle);
+    gamepadFrameHandle = null;
+  }
+  gamepadState.fill(false);
+  if (retroForGamepad) {
+    updateAllInputs(retroForGamepad);
+  }
+});
 
 // Export run() globally so index.html can call it.
 window.run = function (gamePath) {
@@ -207,6 +362,10 @@ window.run = function (gamePath) {
     }
 
     listenKeyboard(retro);
+    keyboardState.fill(false);
+    gamepadState.fill(false);
+    updateAllInputs(retro);
+    attachGamepad(retro);
 
     if (retro.skip_frame) {
       // keep a single frame for testing purpose (optional)
