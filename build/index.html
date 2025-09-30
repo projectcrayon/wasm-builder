@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Arcana Mundi</title>
+    <style>
+      html,
+      body,
+      #selector {
+        display: block;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
+      body {
+        background: black;
+        font-family: sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      #wrapper {
+        text-align: center;
+      }
+      #screen {
+        height: 100vh;
+        width: 125vh;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: -webkit-crisp-edges;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="wrapper">
+      <canvas id="screen"></canvas>
+    </div>
+
+    <script>
+      // Keep Module defined BEFORE loading the rom
+      var Module = Module || {};
+      // Name of the ROM file inside rom.data (must match what you packed)
+      // If you packed a different internal path, update ROM_FILE accordingly.
+      const ROM_FILE = "rom.bin";
+
+      function startCore() {
+        if (typeof window.run !== "function") {
+          requestAnimationFrame(startCore);
+          return;
+        }
+        window.run(ROM_FILE);
+      }
+
+      if (document.readyState === "complete") {
+        startCore();
+      } else {
+        window.addEventListener("load", startCore, { once: true });
+      }
+    </script>
+
+    <script src="https://discord.com/assets/embedded-sdk/2.0.0/discord-embedded-app-sdk.js"></script>
+    <script>
+      //TODO: replace DISCORD_ID
+      DiscordEmbeddedAppSDK.init({ clientId: "DISCORD_ID" }).then(() => {
+        console.log("Discord SDK ready");
+      });
+    </script>
+  </body>
+
+  <script src="rom.js"></script>
+  <script src="wasm/blastem_libretro.js"></script>
+  <script type="module" src="main.js"></script>
+</html>

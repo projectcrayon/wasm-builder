@@ -27,7 +27,7 @@ LDFLAGS += -O3
 SETUP = dist
 
 ifeq ($(OUTDIR),)
-	OUTDIR := ./example
+	OUTDIR := ./build/wasm
 endif
 
 $(FE_RETRO_BC): $(SETUP)
@@ -128,6 +128,6 @@ clean:
 re: clean all
 
 serve:
-	python3 -m http.server 8000 --directory ./example
+	python3 -m http.server 8000 --directory ./build
 
 .PHONY: all clean re gz upload setup_emsdk

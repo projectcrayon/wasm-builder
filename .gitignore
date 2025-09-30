@@ -1,0 +1,5 @@
+# Local Netlify folder
+.netlify
+
+# Docs generated for agents
+AGENTS.md
