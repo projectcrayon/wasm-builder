@@ -39,6 +39,22 @@ function listenKeyboard(retro) {
   }
 
   window.addEventListener("keydown", (e) => {
+    const volumePanel = document.getElementById("volumePanel");
+    const volumeToggle = document.getElementById("volumeToggle");
+
+    if (
+      volumePanel &&
+      volumePanel.getAttribute("aria-hidden") === "false" &&
+      (volumePanel.contains(e.target) || e.target === volumeToggle)
+    ) {
+      if (e.code === "Escape") {
+        volumePanel.setAttribute("aria-hidden", "true");
+        volumeToggle?.setAttribute("aria-expanded", "false");
+        e.preventDefault();
+      }
+      return;
+    }
+
     // Prevent default to avoid scrolling etc.
     e.preventDefault();
     unlockAudioContext();
@@ -48,6 +64,14 @@ function listenKeyboard(retro) {
   });
 
   window.addEventListener("keyup", (e) => {
+    const volumePanel = document.getElementById("volumePanel");
+    if (
+      volumePanel &&
+      volumePanel.getAttribute("aria-hidden") === "false" &&
+      volumePanel.contains(e.target)
+    ) {
+      return;
+    }
     e.preventDefault();
     if (Object.prototype.hasOwnProperty.call(mapping, e.code)) {
       retro.input_user_state[0][mapping[e.code]] = false;
@@ -55,6 +79,21 @@ function listenKeyboard(retro) {
   });
 
   window.addEventListener("keydown", (e) => {
+    const volumePanel = document.getElementById("volumePanel");
+    const volumeToggle = document.getElementById("volumeToggle");
+
+    if (
+      volumePanel &&
+      volumePanel.getAttribute("aria-hidden") === "false" &&
+      (volumePanel.contains(e.target) || e.target === volumeToggle)
+    ) {
+      if (e.code === "Escape") {
+        volumePanel.setAttribute("aria-hidden", "true");
+        volumeToggle?.setAttribute("aria-expanded", "false");
+        e.preventDefault();
+      }
+      return;
+    }
     e.preventDefault();
     if (e.code === "KeyF") {
       const wrapper = document.querySelector("#wrapper");
@@ -96,6 +135,13 @@ function listenKeyboard(retro) {
       retro.setPaused(paused);
     }
     if (e.code === "Escape") {
+      const panel = document.getElementById("volumePanel");
+      const toggle = document.getElementById("volumeToggle");
+      if (panel && panel.getAttribute("aria-hidden") === "false") {
+        panel.setAttribute("aria-hidden", "true");
+        toggle?.setAttribute("aria-expanded", "false");
+        return;
+      }
       // Unload game on explicit request
       retro.unloadGame();
     }
@@ -107,6 +153,11 @@ window.run = function (gamePath) {
   const canvas = document.querySelector("#screen");
   const video = new Video(canvas);
   const audio = new Audio();
+
+  if (typeof window.arcanaVolume === "number") {
+    const presetVolume = Math.min(Math.max(window.arcanaVolume, 0), 1);
+    audio.volume = presetVolume;
+  }
 
   // Wire video/audio for the libretro runtime
   Module.video = video;

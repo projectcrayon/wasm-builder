@@ -31,12 +31,73 @@
         image-rendering: pixelated;
         image-rendering: crisp-edges;
       }
+      #controls {
+        position: fixed;
+        right: 1.5rem;
+        bottom: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.5rem;
+        font-family: inherit;
+        color: #fff;
+      }
+      #volumeToggle {
+        background: rgba(0, 0, 0, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        border-radius: 999px;
+        color: inherit;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: background 0.2s ease, border 0.2s ease;
+      }
+      #volumeToggle:hover,
+      #volumeToggle:focus {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.6);
+        outline: none;
+      }
+      #volumePanel {
+        background: rgba(0, 0, 0, 0.75);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        min-width: 180px;
+        display: none;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      }
+      #volumePanel[aria-hidden="false"] {
+        display: block;
+      }
+      #volumePanel label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        font-size: 0.85rem;
+        color: inherit;
+      }
+      #volumeSlider {
+        width: 120px;
+      }
     </style>
   </head>
 
   <body>
     <div id="wrapper">
       <canvas id="screen"></canvas>
+    </div>
+    <div id="controls">
+      <button id="volumeToggle" type="button" aria-controls="volumePanel" aria-expanded="false" title="Volume">
+        🔊 Volume
+      </button>
+      <div id="volumePanel" role="group" aria-hidden="true">
+        <label for="volumeSlider">
+          Volume
+          <input id="volumeSlider" type="range" min="0" max="100" step="5" value="100" />
+        </label>
+      </div>
     </div>
 
     <script>
@@ -59,6 +120,56 @@
       } else {
         window.addEventListener("load", startCore, { once: true });
       }
+
+      const volumeToggle = document.getElementById("volumeToggle");
+      const volumePanel = document.getElementById("volumePanel");
+      const volumeSlider = document.getElementById("volumeSlider");
+
+      const storedVolume = Number(localStorage.getItem("arcana-volume"));
+      const initialVolume = Number.isFinite(storedVolume)
+        ? Math.min(Math.max(storedVolume, 0), 1)
+        : 1;
+
+      window.arcanaVolume = initialVolume;
+      volumeSlider.value = Math.round(initialVolume * 100);
+
+      function applyVolume(value) {
+        const clamped = Math.min(Math.max(value, 0), 1);
+        window.arcanaVolume = clamped;
+        localStorage.setItem("arcana-volume", String(clamped));
+        if (Module.audio) {
+          Module.audio.volume = clamped;
+        }
+        const icon =
+          clamped === 0 ? "🔇" : clamped < 0.4 ? "🔈" : clamped < 0.75 ? "🔉" : "🔊";
+        volumeToggle.textContent = `${icon} Volume`;
+      }
+
+      volumeSlider.addEventListener("input", (event) => {
+        applyVolume(event.target.value / 100);
+      });
+
+      volumeToggle.addEventListener("click", () => {
+        const isHidden = volumePanel.getAttribute("aria-hidden") !== "false";
+        volumePanel.setAttribute("aria-hidden", String(!isHidden));
+        volumeToggle.setAttribute("aria-expanded", String(isHidden));
+        if (isHidden) {
+          setTimeout(() => volumeSlider.focus({ preventScroll: true }), 0);
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        if (
+          volumePanel.getAttribute("aria-hidden") === "false" &&
+          !volumePanel.contains(event.target) &&
+          !volumeToggle.contains(event.target)
+        ) {
+          volumePanel.setAttribute("aria-hidden", "true");
+          volumeToggle.setAttribute("aria-expanded", "false");
+        }
+      });
+
+      applyVolume(initialVolume);
     </script>
 
     <script src="https://discord.com/assets/embedded-sdk/2.0.0/discord-embedded-app-sdk.js"></script>
